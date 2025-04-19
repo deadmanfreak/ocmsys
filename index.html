@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>ID Organizer</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      background-image: url('00.png');
+      background-size: cover;
+      background-repeat: no-repeat;
+      background-attachment: fixed;
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background-color: rgba(255, 255, 255, 0.8);
+      padding: 10px 30px;
+    }
+    .header h2 {
+      margin: 0;
+    }
+    .logo {
+      width: 50px;
+      height: 50px;
+    }
+    .container {
+      max-width: 800px;
+      margin: 20px auto;
+      background-color: rgba(255, 255, 255, 0.9);
+      padding: 20px;
+      border-radius: 10px;
+      text-align: center;
+    }
+    input[type="text"] {
+      margin-bottom: 10px;
+      padding: 6px;
+      width: 80%;
+      font-size: 16px;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      max-height: 500px;
+      overflow-y: auto;
+      display: block;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 6px;
+      text-align: center;
+    }
+    tr.occupied {
+      background-color: #b2f2bb;
+    }
+    tr.penalty {
+      background-color: #ffa8a8;
+    }
+    button {
+      padding: 4px 8px;
+      margin: 0 2px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    .name-input {
+      width: 90%;
+      padding: 3px;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <h2>ID Organizer (001 - 0300)</h2>
+    <img src="001.png" alt="Logo" class="logo">
+  </div>
+
+  <div class="container">
+    <input type="text" id="searchInput" placeholder="Search ID number or name" onkeyup="searchIDs()">
+
+    <table id="idTable">
+      <thead>
+        <tr>
+          <th>ID Number</th>
+          <th>Owner Name</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+  </div>
+
+  <script>
+    const tableBody = document.getElementById('tableBody');
+    let serverData = {};
+
+    async function loadData() {
+      const res = await fetch('/data');
+      serverData = await res.json();
+      renderTable();
+    }
+
+    async function updateServer(id, name, status) {
+      await fetch('/update', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ id, name, status })
+      });
+    }
+
+    function renderTable() {
+      for (let i = 1; i <= 300; i++) {
+        const id = String(i).padStart(3, '0');
+        const saved = serverData[id] || {};
+        const row = document.createElement('tr');
+        row.id = `row-${id}`;
+        if (saved.status) row.classList.add(saved.status);
+        row.innerHTML = `
+          <td>${id}</td>
+          <td>
+            <input type="text" class="name-input" id="name-${id}" value="${saved.name || ''}"
+              placeholder="Enter name" oninput="saveName('${id}')">
+          </td>
+          <td>
+            <button onclick="setStatus('${id}', 'occupied')">Occupied</button>
+            <button onclick="setStatus('${id}', 'penalty')">Penalty</button>
+            <button onclick="restoreRow('${id}')">Restore</button>
+          </td>
+        `;
+        tableBody.appendChild(row);
+      }
+    }
+
+    async function saveName(id) {
+      const input = document.getElementById(`name-${id}`);
+      await updateServer(id, input.value, undefined);
+    }
+
+    async function setStatus(id, status) {
+      const row = document.getElementById(`row-${id}`);
+      row.className = '';
+      row.classList.add(status);
+      await updateServer(id, undefined, status);
+    }
+
+    async function restoreRow(id) {
+      const row = document.getElementById(`row-${id}`);
+      row.className = '';
+      await updateServer(id, undefined, '');
+    }
+
+    function searchIDs() {
+      const filter = document.getElementById("searchInput").value.toUpperCase();
+      const rows = tableBody.getElementsByTagName("tr");
+      for (let row of rows) {
+        const idCell = row.getElementsByTagName("td")[0];
+        const nameInput = row.getElementsByTagName("input")[0];
+        const idValue = idCell.textContent.toUpperCase();
+        const nameValue = nameInput.value.toUpperCase();
+        row.style.display = idValue.includes(filter) || nameValue.includes(filter) ? "" : "none";
+      }
+    }
+
+    loadData();
+  </script>
+
+</body>
+</html>
